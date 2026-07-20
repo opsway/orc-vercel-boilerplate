@@ -54,9 +54,27 @@ Why route through ORC instead of hitting Odoo directly:
 
 Every app needs its **own** OAuth client — that's the identity users see on the
 consent screen ("_&lt;your app&gt;_ wants access…"), and grants are tracked
-per client. **Don't share one client across two apps.** Registration is
-**self-serve** (Dynamic Client Registration, RFC 7591) — no admin, no client
-secret; it produces a *public* PKCE client.
+per client. **Don't share one client across two apps.**
+
+There are two ways to register, depending on how the app's **environment** is
+decided:
+
+### Recommended for a single-purpose app — ORC's platform "Connected Apps"
+
+If your ORC has the **Connected Apps** admin page, ask a platform admin to
+register the app there. They set the app's name, redirect URIs, **and the
+target environment(s)** — and that environment is then **fixed**: the consent
+screen shows it read-only (users don't pick from their whole list, and can't
+point the app at a different Odoo). They hand you the `ORC_CLIENT_ID`; set it
+(and the matching `ORC_ENV_ID`) in your config and you're done. This is the
+right model for an app that's *about* one Odoo instance.
+
+### Self-serve — Dynamic Client Registration (generic/agent connectors)
+
+For a connector that legitimately spans the user's whole catalog (claude.ai
+style), or an ORC without the Connected Apps UI, use DCR — **self-serve**
+(RFC 7591), no admin, no client secret; it produces a *public* PKCE client.
+Here the **user** picks the environment at consent.
 
 `scripts/register-client.mjs` does it in one call. **Register every URL the app
 will ever be served from, up front** — local dev, the Vercel domain, and any
