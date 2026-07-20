@@ -212,6 +212,13 @@ The demo is deliberately one query + one table. To adapt it:
 - **Rename the app** — `CLIENT_NAME` at registration is what users see on the
   consent screen; pick something honest.
 
+> **Building something real on top of this?** See
+> [`docs/extending-the-boilerplate.md`](docs/extending-the-boilerplate.md) —
+> adding a **Neon** persistence layer (and the Sensitive-env gotcha that breaks
+> local dev), keeping `APP_URL` from failing the build, Odoo call recipes
+> (`intent`, forgiving partner search, writes), resolving the logged-in user,
+> and assorted Next.js/Vercel gotchas. Findings from a real app built on this.
+
 ## Auth & session details (what the code actually does)
 
 - **PKCE public client** — no client secret exists; the code exchange is bound
