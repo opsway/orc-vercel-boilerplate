@@ -50,6 +50,60 @@ Why route through ORC instead of hitting Odoo directly:
 - Optional but useful: the [`orc` CLI](https://github.com/opsway/odoo-agent-gateway/tree/master/tools/orc-cli)
   to discover environment IDs and remote tools.
 
+## Register the app (one OAuth client per app)
+
+Every app needs its **own** OAuth client — that's the identity users see on the
+consent screen ("_&lt;your app&gt;_ wants access…"), and grants are tracked
+per client. **Don't share one client across two apps.** Registration is
+**self-serve** (Dynamic Client Registration, RFC 7591) — no admin, no client
+secret; it produces a *public* PKCE client.
+
+`scripts/register-client.mjs` does it in one call. **Register every URL the app
+will ever be served from, up front** — local dev, the Vercel domain, and any
+custom domain — so you never have to re-register (which would mint a new client
+id and force every user to re-consent):
+
+```sh
+cd orc-vercel-boilerplate            # this repo — the script lives here
+APP_URL=http://localhost:3001 \
+EXTRA_REDIRECT_URLS=https://my-app.vercel.app,https://my-app.opsway.com \
+CLIENT_NAME="My App" \
+npm run register-client
+```
+
+- `APP_URL` — the primary base URL; the redirect becomes `<APP_URL>/api/auth/callback`.
+- `EXTRA_REDIRECT_URLS` — comma-separated additional base URLs (each gets
+  `/api/auth/callback` appended). Optional; use it to cover every host at once.
+- `CLIENT_NAME` — what users see on the consent screen. Make it honest and
+  specific (it's how someone tells your app apart from anyone else's).
+- `ORC_URL` — defaults to `https://help.opsway.com`; set it for a different ORC.
+
+It prints:
+
+| Output | What to do with it |
+|---|---|
+| `ORC_CLIENT_ID` | put in `.env.local` (local) **and** the deployed project's env vars |
+| `redirect_uris` | echo of what was registered — Hydra matches these **character-exact** |
+| `registration_access_token` + `registration_client_uri` | **keep private** (not in the repo). They let you *update* this client later (RFC 7592) — e.g. add a redirect URL — without minting a new id |
+
+**Adding a URL later** (a new custom domain) without a new client id — PATCH the
+registration instead of re-running the script:
+
+```sh
+curl -X PATCH "$REGISTRATION_CLIENT_URI" \
+  -H "Authorization: Bearer $REGISTRATION_ACCESS_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"redirect_uris":["https://my-app.vercel.app/api/auth/callback","https://my-app.opsway.com/api/auth/callback"]}'
+```
+
+> **Two failure modes to know.** (1) *`redirect_uri … does not match`* at login →
+> the host you're serving from isn't among the registered `redirect_uris`
+> (register it, exact match incl. scheme + port). (2) On an ORC that enforces a
+> **redirect-host allowlist**, a registered URL can still be refused with
+> *`unauthorized_client … redirect address is not allowed`* — the operator must
+> allow the app's domain. A custom domain under a zone the org controls (e.g.
+> `*.opsway.com`) is the durable fix: registered once, allowlisted once.
+
 ## Quickstart (local)
 
 1. **Get the code** (clone, or copy the folder — nothing here is
@@ -60,17 +114,16 @@ Why route through ORC instead of hitting Odoo directly:
    cd orc-vercel-boilerplate && npm install
    ```
 
-2. **Register your OAuth client** (one-time, self-serve — no admin involved):
+2. **Register your OAuth client** — see [Register the app](#register-the-app-one-oauth-client-per-app)
+   above. For a purely local start, the minimum is:
 
    ```sh
    APP_URL=http://localhost:3001 CLIENT_NAME="My Sales Orders app" npm run register-client
    ```
 
-   This performs RFC 7591 Dynamic Client Registration against ORC and prints an
-   `ORC_CLIENT_ID`. It registers a **public PKCE client** — there is no client
-   secret to protect. Save the printed `registration_access_token` somewhere
-   private if you'll ever need to update the client (e.g. add a redirect URL —
-   RFC 7592); it manages only this registration, it grants no data access.
+   Copy the printed `ORC_CLIENT_ID` for the next step. (Going to deploy? Register
+   the Vercel + custom-domain URLs now too, via `EXTRA_REDIRECT_URLS` — one
+   registration covers every host.)
 
 3. **Configure**:
 
@@ -109,16 +162,12 @@ vercel --prod     # production deploy
 Then wire production up:
 
 1. Note the stable production URL: `https://<project>.vercel.app`.
-2. Add it to your OAuth client's redirect URLs — either re-register with both:
-
-   ```sh
-   APP_URL=http://localhost:3001 \
-   EXTRA_REDIRECT_URLS=https://<project>.vercel.app \
-   npm run register-client
-   ```
-
-   (or PATCH the existing client at its `registration_client_uri` using the
-   saved `registration_access_token` — RFC 7592.)
+2. Make sure that URL's callback is on the client's `redirect_uris`. If you
+   registered it up front (recommended — see
+   [Register the app](#register-the-app-one-oauth-client-per-app)), you're done.
+   If not, add it to the **existing** client (keeps the same `ORC_CLIENT_ID`, no
+   re-consent) via the RFC 7592 PATCH shown in that section — don't re-run the
+   registration script, which mints a new client id.
 3. Set the four env vars on the Vercel project (dashboard or `vercel env add`):
    `ORC_URL`, `ORC_CLIENT_ID`, `ORC_ENV_ID`, and
    `APP_URL=https://<project>.vercel.app`.
