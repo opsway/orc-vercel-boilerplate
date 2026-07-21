@@ -84,7 +84,7 @@ id and force every user to re-consent):
 ```sh
 cd orc-vercel-boilerplate            # this repo — the script lives here
 APP_URL=http://localhost:3001 \
-EXTRA_REDIRECT_URLS=https://my-app.vercel.app,https://my-app.opsway.com \
+EXTRA_REDIRECT_URLS=https://my-app.app.opsway.com \
 CLIENT_NAME="My App" \
 npm run register-client
 ```
@@ -111,7 +111,7 @@ registration instead of re-running the script:
 curl -X PATCH "$REGISTRATION_CLIENT_URI" \
   -H "Authorization: Bearer $REGISTRATION_ACCESS_TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"redirect_uris":["https://my-app.vercel.app/api/auth/callback","https://my-app.opsway.com/api/auth/callback"]}'
+  -d '{"redirect_uris":["http://localhost:3001/api/auth/callback","https://my-app.app.opsway.com/api/auth/callback"]}'
 ```
 
 > **Two failure modes to know.** (1) *`redirect_uri … does not match`* at login →
@@ -119,8 +119,10 @@ curl -X PATCH "$REGISTRATION_CLIENT_URI" \
 > (register it, exact match incl. scheme + port). (2) On an ORC that enforces a
 > **redirect-host allowlist**, a registered URL can still be refused with
 > *`unauthorized_client … redirect address is not allowed`* — the operator must
-> allow the app's domain. A custom domain under a zone the org controls (e.g.
-> `*.opsway.com`) is the durable fix: registered once, allowlisted once.
+> allow the app's domain. A custom domain under an org-controlled zone (on
+> `help.opsway.com`, an `*.app.opsway.com` host) is the durable fix: registered
+> once, allowlisted once. See the callback-domain note in the deploy section —
+> `*.vercel.app` and bare `*.opsway.com` hosts are **not** on that allowlist.
 
 ## Quickstart (local)
 
