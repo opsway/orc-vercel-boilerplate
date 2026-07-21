@@ -169,9 +169,17 @@ vercel            # first run creates/links the project, deploys a preview
 vercel --prod     # production deploy
 ```
 
+> **Pick your callback domain BEFORE you deploy — read the allowlist note at
+> the end of this section first.** On an ORC that enforces a redirect-host
+> allowlist (e.g. `help.opsway.com`), a `*.vercel.app` URL cannot be used as a
+> callback at all — you must serve the app from an org-controlled domain such as
+> `*.app.opsway.com`. If that applies to you, substitute that host for
+> `<project>.vercel.app` in every step below.
+
 Then wire production up:
 
-1. Note the stable production URL: `https://<project>.vercel.app`.
+1. Note the stable production URL: `https://<project>.vercel.app` (or your
+   org-controlled domain — see the callback note below).
 2. Make sure that URL's callback is on the client's `redirect_uris`. If you
    registered it up front (recommended — see
    [Register the app](#register-the-app-one-oauth-client-per-app)), you're done.
@@ -184,10 +192,17 @@ Then wire production up:
 4. `vercel --prod` again to pick them up. Share the URL — every colleague logs
    in as **themselves** and sees what *their* permissions allow.
 
-> **If the ORC deployment enforces a redirect-host allowlist** (recommended for
-> production ORCs), ask the ORC operator to allow your app's exact domain
-> (`<project>.vercel.app`). Never expect `*.vercel.app` to be allowed — it's a
-> shared hosting zone, anyone can deploy there.
+> **Callback domain — the allowlist is a hard requirement, not a maybe.**
+> Production ORCs enforce a redirect-host allowlist. `*.vercel.app` is a shared
+> hosting zone (anyone can deploy there), so it is **not** an acceptable callback
+> host — and this is not fixable by asking the operator to allow your one
+> `<project>.vercel.app` host. On `help.opsway.com` the callback must live under
+> an **org-controlled zone** (e.g. `*.app.opsway.com`). So point such a host at
+> the Vercel project, register `https://<host>/api/auth/callback`, and set
+> `APP_URL` to it. A bare `*.vercel.app` deploy will build, register its
+> redirect_uri, and even reach ORC's login screen — but the callback is rejected,
+> so **login can never complete**. Decide the domain up front; moving it later
+> means re-registering redirect URIs.
 
 > **Preview deployments** get per-deploy URLs that were never registered as
 > redirect URLs — log in on the production URL (or register a preview URL
