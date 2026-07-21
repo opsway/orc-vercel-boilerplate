@@ -118,10 +118,11 @@ curl -X PATCH "$REGISTRATION_CLIENT_URI" \
 > the host you're serving from isn't among the registered `redirect_uris`
 > (register it, exact match incl. scheme + port). (2) On an ORC that enforces a
 > **redirect-host allowlist**, a registered URL can still be refused with
-> *`unauthorized_client … redirect address is not allowed`* — the operator must
-> allow the app's domain. A custom domain under an org-controlled zone (on
-> `help.opsway.com`, an `*.app.opsway.com` host) is the durable fix: registered
-> once, allowlisted once. See the callback-domain note in the deploy section —
+> *`unauthorized_client … redirect address is not allowed`* — the host's zone
+> isn't allowlisted. On `help.opsway.com` the allowlisted zone is
+> `*.app.opsway.com`, a **wildcard already pointing at Vercel**, so serving from
+> an `<name>.app.opsway.com` host is allowed out of the box — no per-app operator
+> request, no new DNS. See the callback-domain note in the deploy section;
 > `*.vercel.app` and bare `*.opsway.com` hosts are **not** on that allowlist.
 
 ## Quickstart (local)
@@ -189,18 +190,22 @@ vercel            # first run creates/links the project, deploys a preview
 vercel --prod     # production deploy
 ```
 
-> **Pick your callback domain BEFORE you deploy — read the allowlist note at
-> the end of this section first.** On an ORC that enforces a redirect-host
-> allowlist (e.g. `help.opsway.com`), a `*.vercel.app` URL cannot be used as a
-> callback at all — you must serve the app from an org-controlled domain such as
-> `*.app.opsway.com`. If that applies to you, substitute that host for
-> `<project>.vercel.app` in every step below.
+> **Serve the app from `*.app.opsway.com`, not `*.vercel.app`.** `help.opsway.com`
+> enforces a redirect-host allowlist that `*.vercel.app` is not on, so a bare
+> vercel.app deploy can't complete login (details in the note at the end of this
+> section). `*.app.opsway.com` is a **wildcard that already points at Vercel and
+> is already allowlisted** — no DNS to create, no operator request to make. Just
+> pick any **unique** hostname under it (e.g. `my-app.app.opsway.com`) and use it
+> in place of `<project>.vercel.app` in every step below.
 
 Then wire production up:
 
-1. Note the stable production URL: `https://<project>.vercel.app` (or your
-   org-controlled domain — see the callback note below).
-2. Make sure that URL's callback is on the client's `redirect_uris`. If you
+1. Pick a unique `https://<name>.app.opsway.com` and add it as a domain on the
+   Vercel project (`vercel domains add <name>.app.opsway.com`, or the dashboard).
+   The `*.app.opsway.com` wildcard already resolves to Vercel, so it goes live
+   with no new DNS record.
+2. Make sure `https://<name>.app.opsway.com/api/auth/callback` is on the client's
+   `redirect_uris`. If you
    registered it up front (recommended — see
    [Register the app](#register-the-app-one-oauth-client-per-app)), you're done.
    If not, add it to the **existing** client (keeps the same `ORC_CLIENT_ID`, no
@@ -208,21 +213,24 @@ Then wire production up:
    registration script, which mints a new client id.
 3. Set the four env vars on the Vercel project (dashboard or `vercel env add`):
    `ORC_URL`, `ORC_CLIENT_ID`, `ORC_ENV_ID`, and
-   `APP_URL=https://<project>.vercel.app`.
+   `APP_URL=https://<name>.app.opsway.com`.
 4. `vercel --prod` again to pick them up. Share the URL — every colleague logs
    in as **themselves** and sees what *their* permissions allow.
 
 > **Callback domain — the allowlist is a hard requirement, not a maybe.**
-> Production ORCs enforce a redirect-host allowlist. `*.vercel.app` is a shared
-> hosting zone (anyone can deploy there), so it is **not** an acceptable callback
-> host — and this is not fixable by asking the operator to allow your one
-> `<project>.vercel.app` host. On `help.opsway.com` the callback must live under
-> an **org-controlled zone** (e.g. `*.app.opsway.com`). So point such a host at
-> the Vercel project, register `https://<host>/api/auth/callback`, and set
-> `APP_URL` to it. A bare `*.vercel.app` deploy will build, register its
-> redirect_uri, and even reach ORC's login screen — but the callback is rejected,
-> so **login can never complete**. Decide the domain up front; moving it later
-> means re-registering redirect URIs.
+> `help.opsway.com` enforces a redirect-host allowlist. `*.vercel.app` is a
+> shared hosting zone (anyone can deploy there), so it is **not** on the
+> allowlist — and that is not fixable by asking the operator to allow your one
+> `<project>.vercel.app` host. A bare `*.vercel.app` deploy will build, register
+> its redirect_uri, and even reach ORC's login screen — but the callback is
+> rejected, so **login can never complete**.
+>
+> The allowlisted zone is **`*.app.opsway.com`**, and it's a **wildcard already
+> pointing at Vercel** — so any unique hostname under it (`<name>.app.opsway.com`)
+> works as a callback with zero DNS or operator steps: add it as a domain on your
+> Vercel project, register `https://<name>.app.opsway.com/api/auth/callback`, and
+> set `APP_URL` to it. Pick the name up front; changing it later means
+> re-registering redirect URIs.
 
 > **Preview deployments** get per-deploy URLs that were never registered as
 > redirect URLs — log in on the production URL (or register a preview URL
