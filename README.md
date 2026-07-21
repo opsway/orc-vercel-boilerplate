@@ -144,9 +144,19 @@ curl -X PATCH "$REGISTRATION_CLIENT_URI" \
 
    Click **Log in with ORC**. You'll authenticate on ORC (your existing
    session or Google SSO — this app never sees credentials), then ORC shows
-   the **consent screen**: which app is asking, what it wants, and the
-   environment picker with this app's environment pre-checked. Allow → you're
-   back, with a table of that environment's recent Sales Orders.
+   the **consent screen**, and what it looks like depends on how the app was
+   registered:
+   - **DCR client** (the `register-client.mjs` script above) → an environment
+     **picker** with this app's env pre-checked but still changeable. This is
+     correct for a generic connector, but it means the user *can* point the app
+     at a different environment.
+   - **Connected App** (registered by a platform admin — see
+     [Register the app](#register-the-app-one-oauth-client-per-app)) → the
+     environment is shown **read-only, no picker**: the app is locked to the
+     environment it was registered for. **This is what you want for a
+     single-purpose app.**
+
+   Allow → you're back, with a table of that environment's recent Sales Orders.
 
 ## Deploy to Vercel — no Git required
 
@@ -245,6 +255,7 @@ The demo is deliberately one query + one table. To adapt it:
 
 | Symptom | Cause / fix |
 |---|---|
+| Consent shows the **full environment list** and I can pick others (even though one is pre-checked) | Your app is a **generic DCR client** (registered with `register-client.mjs`) — generic clients always get the picker. To lock it to a single environment (read-only, no picker), **register it as a Connected App** via ORC's platform admin instead; the admin sets the environment there and it becomes fixed. Then set `ORC_CLIENT_ID` to the new managed client. This is a *registration* change, not a code change — the boilerplate needs no extra hooks. |
 | `unauthorized_client … redirect address is not allowed` at login | The ORC deployment enforces a redirect-host allowlist and your domain isn't on it — ask the ORC operator to add the app's exact host. |
 | `this app was not granted access to this environment` | The user consented to different environment(s) than `ORC_ENV_ID`. Log out, log in again, and select the right environment on the consent screen. |
 | `OAuth state mismatch` after login | The 10-minute login window expired or cookies were blocked mid-flow — just click **Log in** again. |
