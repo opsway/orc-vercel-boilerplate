@@ -35,18 +35,27 @@ npm i @neondatabase/serverless
 import { neon } from '@neondatabase/serverless';
 const sql = neon(dbUrl());
 
-// Parameterized query — call the function directly:
-const rows = await sql('SELECT * FROM ideas WHERE stage = $1', ['sold']);
+// Parameterized query — use .query() (see the first gotcha below):
+const rows = await sql.query('SELECT * FROM ideas WHERE stage = $1', ['sold']);
 ```
 
 Three things that will bite you:
 
-- **`neon()` has no `.query()` method.** Call `sql(text, params)` (or the
-  tagged-template `` sql`...` ``). `sql.query(...)` is a TypeScript trap — it
-  compiles in your head, not in `tsc`.
-- **The HTTP driver talks to Neon only.** It will not connect to a local/Docker
-  Postgres, so local dev needs a *real* Neon URL (see the gotcha below). If you
-  truly need a local non-Neon DB, use the package's `Pool` (WebSocket) instead.
+- **Use `sql.query(text, params)` for placeholder queries** (or the
+  tagged-template `` sql`...` ``). Current `@neondatabase/serverless` versions
+  *disable* the bare `sql(text, params)` call form as a SQL-injection foot-gun —
+  it throws at runtime: *"can now be called only as a tagged-template function …
+  use sql.query(…)"*. `.query()` returns the rows array directly (same shape as
+  node-postgres' `.rows`). This bites **only in production** if you develop
+  locally against a different driver (see next bullet) — it never shows up in
+  `tsc` or local dev.
+- **The HTTP driver talks to Neon only.** It won't connect to a local/Docker
+  Postgres. For offline local dev, swap drivers by connection string — use
+  node-postgres (`pg.Pool`) against a Docker Postgres locally and `neon()` on
+  Vercel, both behind one `sql(text, params)` helper that returns rows the same
+  way. That avoids needing a real Neon URL just to run locally, and is why the
+  `.query()` mismatch above only surfaces in prod. (Alternatively, run the
+  `neondatabase/neon_local` proxy so the serverless driver itself works locally.)
 - **One statement per call.** No multi-statement scripts — keep DDL as a list of
   `CREATE TABLE IF NOT EXISTS` statements and run them in sequence.
 
